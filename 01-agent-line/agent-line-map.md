@@ -10,26 +10,39 @@ List every discrete decision or action in your agent's workflow, then score each
 
 | Decision / action | Reversibility (H/M/L) | Blast radius (H/M/L) | Measurability (H/M/L) | Above / Below | HITL? |
 |---|---|---|---|---|---|
-| _Pull project state + recent GitHub/Jira activity_ | H | L | H | Below | · |
-| _Draft the weekly leadership status update_ | H | M | M | Below | spot-check |
-| _Propose next sprint's stories from the PRD (within cap)_ | M | M | M | Below | spot-check |
-| _Post the update to a channel / commit a ship date_ | L | H | M | Above | required |
-| _Mark a launch gate green / merge or close a ticket_ | L | H | M | Above | required |
-| _…_ | | | | | |
+| Pull project state + recent activity | H | L | H | Below | · |
+| Decide relevant context (within guardrails) | H | L | M | HITL | review in draft |
+| Surface "unsure if relevant" items to a human | H | L | H | Below | · (this is the checkpoint for context) |
+| Draft the weekly leadership status update | H | L | M | HITL | required |
+| Decide tone | M | M | M | HITL | review in draft |
+| Decide commitment level | L | M | M | Above | required |
+| Flag at-risk / escalation (to a human) | H | L | H | Below | · |
+| Choose what to escalate | L | H | H | Above | required |
+| Propose a story batch (capped) | H | L | H | Below | · |
+| Post the update / approve a company-wide one | L | H | L | Above | required |
 
 ## Agent anatomy (sketch)
 
-- **Model:** _your default fast model + when you escalate to a frontier model, and why_
-- **Tools:** _project + activity lookup (read) · past-update search · roadmap · team norms · story proposal (capped) …_
-- **Memory:** _what persists across runs (roadmap, decisions, norms) vs. purged_
+- **Model:** `gpt-4o-mini` for the whole run (drafter and critic), ~$0.004 a run. No escalation to a frontier model for now; revisit in M3 if the critic stays inconsistent on Green/Yellow calls.
+- **Tools:** read-only `get_task` · `get_project` · `get_activity` · `search_past_updates` · `get_roadmap` · `get_norms`, plus `propose_stories`, which only queues a capped batch for human approval. Deliberately no post, create, or merge tools.
+- **Memory:** persists across runs: team norms, roadmap, decision log, past *approved* updates. Purged each run: the task brief, raw pulled activity, and unapproved drafts, so a rejected draft never becomes precedent. Never stored or repeated: roadmap items marked confidential.
 - **Loop:** _placeholder, defined in M2 loop-spec.md_
 - **Bounds:** _placeholder, defined in M5 bounds-and-evals.md_
 - **Evals:** _placeholder, defined in M5 bounds-and-evals.md_
 
 ## The golden rule, applied
 
-_One sentence per above-the-line decision: why it stays human (which of reversibility / blast radius / measurability failed)._
+1. **Pull project state + recent activity** sits below the line because it's easy to undo, has a low blast radius, and is easy to verify: "you can pull this from all the different resources autonomously." Deciding factor: blast radius (read-only, changes nothing).
+2. **Decide relevant context** is HITL because it's easy to undo and has a low blast radius, but is only medium to verify, since a missed piece of context is hard to spot. Deciding factor: measurability.
+3. **Surface "unsure if relevant" items** sits below the line because it's easy to undo, has a low blast radius, and is easy to verify; it only reaches me. Deciding factor: blast radius.
+4. **Draft the update** is HITL because it's easy to undo and has a low blast radius, but is only medium to verify: "you can use the information and an example to draft the update." Deciding factor: measurability (even the critic couldn't agree on Green vs Yellow).
+5. **Decide tone** is HITL because it's medium on all three axes, so nothing forces it either way. Deciding factor: blast radius (the tone reaches leadership).
+6. **Decide commitment level** sits above the line because a commitment in writing is hard to reverse. Deciding factor: reversibility.
+7. **Flag at-risk / escalation** sits below the line because it's easy to undo, easy to verify, and has a low blast radius "if the agent is just flagging the risk to the HITL." Deciding factor: blast radius.
+8. **Choose what to escalate** sits above the line because it's hard to reverse and has a high blast radius: "this is a human decision ultimately." Deciding factor: reversibility (a missed escalation can't be undone).
+9. **Propose a story batch (capped)** sits below the line because it's easy to undo, has a low blast radius, and is easy to verify: "you have the context and guidelines to propose the stories." Deciding factor: blast radius (stories are queued and capped).
+10. **Post the update / approve a company-wide one** sits above the line because it fails all three axes: "if it's a company-wide update I'd prefer to update the company-wide resource e.g. SharePoint." Deciding factor: blast radius.
 
 ## Hardest call
 
-_Your toughest "above vs below" decision and how you resolved it. (Share this in `#cohort-channel`.)_
+**Decide tone and commitment level.** I first put it above the line, but my concern was never the tone, it was the *commitment*. Splitting it settled it: committing in writing is hard to walk back, so **reversibility** keeps commitment level above the line, while tone scored medium on every axis and moved to HITL, where I review it in the draft.
