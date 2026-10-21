@@ -23,7 +23,7 @@ List every discrete decision or action in your agent's workflow, then score each
 
 ## Agent anatomy (sketch)
 
-- **Model:** `gpt-4o-mini` for the whole run (drafter and critic), ~$0.004 a run. No escalation to a frontier model for now; revisit in M3 if the critic stays inconsistent on Green/Yellow calls.
+- **Model:** `gpt-4o-mini` drafts; the critic runs on `gpt-4o`, ~$0.009 a run. Started on `gpt-4o-mini` for both; the cheap critic flip-flopped on Green/Yellow calls, so in M2 the critic moved to the stronger model (the one place judgment matters most, and a short call).
 - **Tools:** read-only `get_task` · `get_project` · `get_activity` · `search_past_updates` · `get_roadmap` · `get_norms`, plus `propose_stories`, which only queues a capped batch for human approval. Deliberately no post, create, or merge tools.
 - **Memory:** persists across runs: team norms, roadmap, decision log, past *approved* updates. Purged each run: the task brief, raw pulled activity, and unapproved drafts, so a rejected draft never becomes precedent. Never stored or repeated: roadmap items marked confidential.
 - **Loop:** _placeholder, defined in M2 loop-spec.md_

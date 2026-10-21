@@ -22,7 +22,7 @@ Real screenshots of *your* Cortex running. These are the `00-build/CORTEX-ANATOM
 | # | Screenshot | What it shows | From |
 |---|---|---|---|
 | 1 | ![M2 happy-path run: critic pass, HITL checkpoint and EXIT: SUCCESS](img/m2-happy-path-success.png) | happy-path run: a real drafted update + the HITL checkpoint (queued, not posted). The critic passes with no hard violations, Cortex stops at the HITL checkpoint (`EXIT: SUCCESS`), and the drafted Northstar update (Green, #812/#815 merged, #818 open at normal severity, activation 39% → 41%) plus 10 proposed stories are queued for review. Nothing posted, run cost ≈ $0.009. | M2 |
-| 2 | _[img]_ | the critic rejecting a bad draft (revise/block) | M3 |
+| 2 | [Transcript: critic rejects a planted bad draft](m3-critic-reject.md) | the critic rejecting a bad draft (revise/block). A planted draft (activation 55%, GA committed for 15 July) fails checks 1 and 2 with full reasons; the revise action sends Cortex only those reasons, and its revision fixes both (41%, no date). Run cost ≈ $0.024, nothing posted. | M3 |
 | 3 | _[img]_ | a grounded update citing pulled activity + a caught hallucination | M4 |
 | 4 | _[img]_ | jailbreak refused + escalated | M5 |
 | 5 | _[img]_ | an iteration/cost/queue bound halting a runaway | M5 |

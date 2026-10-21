@@ -107,7 +107,13 @@ Anything else (wording, emphasis, a status you'd have called differently, missin
 context) goes in "notes" and does NOT fail the draft.
 
 Respond as strict JSON:
-{"verdict": "pass" | "fail", "reasons": ["<hard violation, cite the check #>"],
+{"verdict": "pass" | "fail", "reasons": ["<one full sentence per hard violation>"],
  "notes": ["<non-blocking suggestion>"]}
 Fail if ANY applicable hard check fails. "reasons" must be empty on a pass.
+
+Each reason goes back to Cortex on its own (Cortex never sees your notes), so it must
+be fixable without them. Write it as: "Check <#> (<name>): <what the draft says> ->
+<what the pulled data or norm says, i.e. the fix>". Example:
+"Check 1 (traceable): says activation is 55% -> the pulled data shows 41%."
+Never return a bare check number.
 """
