@@ -12,9 +12,12 @@ Usage (ask your coding agent to run these for you, or run them yourself):
     python agent.py missing-data   # the stuck/escalate case
     python agent.py jailbreak       # the prompt-injection refusal case
 
-Every run ends by showing the drafted status update in a FINAL STATUS UPDATE block
-(or LAST DRAFT, held, if a bound trips), and saves it to run-output/. That file is
-always a draft held for a human, it is never posted, there is no publish tool.
+Every run ends in exactly one of the Loop Spec exits (02-loop-design/loop-spec.md §3):
+SUCCESS, STUCK: PARTIAL (finished with parked sections), STUCK: TOTAL, or ESCALATE.
+It shows the drafted status update in a FINAL STATUS UPDATE block (or LAST DRAFT,
+held, on a stuck/escalate exit), and saves the draft plus a run summary (what was
+pulled, gaps and errors, critic verdicts, story queue) to run-output/. That draft is
+always held for a human, it is never posted, there is no publish tool.
 
 Requires OPENAI_API_KEY in your environment (see .env.example). Model and bounds
 are read from env so you can tune them, that tuning is your M5 deliverable.
@@ -27,7 +30,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from openai import OpenAI
@@ -52,6 +57,29 @@ MAX_QUEUE_ITEMS = int(os.environ.get("CORTEX_MAX_QUEUE_ITEMS", "10"))
 # Rough $ per 1M tokens for your chosen model, set to match its pricing.
 PRICE_IN = float(os.environ.get("CORTEX_PRICE_IN_PER_M", "0.15"))
 PRICE_OUT = float(os.environ.get("CORTEX_PRICE_OUT_PER_M", "0.60"))
+# The critic runs on its own (stronger) model so it can apply its checks reliably;
+# the drafter stays cheap. Priced separately so the cost cap counts it correctly.
+CRITIC_MODEL = os.environ.get("CORTEX_CRITIC_MODEL", "gpt-4o")
+CRITIC_PRICE_IN = float(os.environ.get("CORTEX_CRITIC_PRICE_IN_PER_M", "2.50"))
+CRITIC_PRICE_OUT = float(os.environ.get("CORTEX_CRITIC_PRICE_OUT_PER_M", "10.00"))
+
+# --- Loop Spec (M2): stop conditions --------------------------------------------
+# A source that fails this many times is parked (non-core) or halts the run (core).
+MAX_SOURCE_ATTEMPTS = int(os.environ.get("CORTEX_MAX_SOURCE_ATTEMPTS", "3"))
+CORE_SOURCES = {"get_project", "get_activity"}
+# "Stale" = no updates this week. The report week is any date in it (YYYY-MM-DD);
+# blank means today. Test runs on the fixtures use the fixture week, 2026-06-29.
+_report = os.environ.get("CORTEX_REPORT_WEEK", "").strip()
+REPORT_DATE = date.fromisoformat(_report) if _report else date.today()
+WEEK_START = REPORT_DATE - timedelta(days=REPORT_DATE.weekday())
+WEEK_END = WEEK_START + timedelta(days=6)
+
+# The four exits from Loop Spec §3. Every run ends in exactly one.
+SUCCESS = "SUCCESS"
+STUCK_PARTIAL = "STUCK: PARTIAL"
+STUCK_TOTAL = "STUCK: TOTAL"
+ESCALATE = "ESCALATE"
+ESCALATE_MARK = re.compile(r"^\W*ESCALATE\W*:[\s*_]*(.*)$", re.IGNORECASE | re.MULTILINE)
 
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
@@ -101,6 +129,23 @@ class Bounds:
         return self.cost >= COST_CAP_USD
 
 
+class RunLog:
+    """Loop Spec state for one run: what was pulled, per-source failures, parked
+    sections, staleness, critic verdicts, and the story queue. The stop conditions
+    read these, and the run summary is written from them."""
+
+    def __init__(self):
+        self.pulls: list[dict] = []
+        self.task_project = ""  # from the brief's "Project:" line; scopes the core halt
+        self.failures: dict[str, int] = {}
+        self.parked: list[str] = []
+        self.stale = ""
+        self.core_failure = ""
+        self.facts: dict = {}  # Sev-1 / launch_hold / status, computed for the critic
+        self.critic: list[dict] = []
+        self.stories: dict | None = None
+
+
 OUTPUT_DIR = Path(__file__).parent / "run-output"
 
 
@@ -108,44 +153,176 @@ def banner(text: str) -> None:
     print(f"\n{'=' * 64}\n{text}\n{'=' * 64}")
 
 
-def emit_deliverable(which: str, draft: str, *, accepted: bool,
-                     reason: str, cost: float) -> None:
-    """Surface AND persist Cortex's drafted status update so it can't get lost in
-    the scroll-back. This is still a DRAFT held for human review, never a post,
-    there is no publish tool, and an escalated run is held on purpose.
+def _parse_date(value) -> date | None:
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
-    Runs on every exit: an accepted pass prints the FINAL update; a bound trip or
-    escalation prints the LAST draft it managed to write plus why it was held.
+
+def check_stale(result: dict, log: RunLog) -> dict:
+    """Flag activity as stale when nothing in it is dated within the report week."""
+    dates = [_parse_date(a.get("date")) for a in result.get("activity", [])]
+    if any(d and WEEK_START <= d <= WEEK_END for d in dates):
+        return result
+    log.stale = f"no activity dated in the report week ({WEEK_START} to {WEEK_END})"
+    return {**result, "stale": True,
+            "action": f"STALE: {log.stale}. Do not present this as this week's progress: "
+                      "say the data is stale and mark the activity section [needs input]."}
+
+
+def call_tool(fn: str, args: dict, log: RunLog) -> dict:
+    """Run one tool and apply the Loop Spec source rules: count failures, park a
+    non-core source after MAX_SOURCE_ATTEMPTS, halt on a core source, flag staleness.
+    Failures on a project other than the task's are counted separately and never halt
+    the run: a lookup of some project named in pasted notes isn't core data."""
+    pid = str(args.get("project_id", "")).strip()
+    off_task = bool(fn in CORE_SOURCES and pid and log.task_project
+                    and pid.upper() != log.task_project.upper())
+    key = f"{fn}:{pid}" if off_task else fn
+    if fn in log.parked:
+        return {"error": "source_parked", "source": fn,
+                "action": "this source is parked; mark its section [needs input] and finish the rest"}
+    try:
+        result = tools.TOOLS[fn](**args)
+    except Exception as exc:  # a broken or unknown source counts as a failed attempt
+        result = {"error": "tool_exception", "detail": str(exc)}
+
+    failed = fn != "propose_stories" and isinstance(result, dict) and "error" in result
+    log.pulls.append({"time": datetime.now().isoformat(timespec="seconds"), "source": fn,
+                      "args": args, "result": result.get("error", "ok") if failed else "ok"})
+    if failed:
+        attempts = log.failures[key] = log.failures.get(key, 0) + 1
+        if off_task:
+            result = {**result, "action": f"{pid} is not this task's project "
+                                          f"({log.task_project}); don't retry it, leave it "
+                                          "out of the update"}
+        elif attempts >= MAX_SOURCE_ATTEMPTS:
+            if fn in CORE_SOURCES:
+                log.core_failure = f"{fn} failed {attempts}x ({result['error']})"
+            else:
+                log.parked.append(fn)
+                result = {**result, "parked": True,
+                          "action": f"{fn} failed {attempts}x and is parked; mark its section "
+                                    "[needs input] and finish the rest of the update"}
+    elif off_task:
+        pass  # another project's data never feeds the task's facts or staleness
+    elif fn == "get_project":
+        log.facts["launch_hold"] = "launch_hold" in result.get("flags", [])
+        log.facts["status"] = result.get("status", "unknown")
+    elif fn == "get_activity":
+        log.facts["open_sev1"] = [a.get("id") for a in result.get("activity", [])
+                                  if a.get("type") == "issue_open"
+                                  and str(a.get("severity", "")).lower() == "sev-1"]
+        result = check_stale(result, log)
+    if fn == "propose_stories":
+        log.stories = result
+    return result
+
+
+def facts_block(log: RunLog) -> str:
+    """The norms-critical facts, read from the pulled data in code so the critic never
+    has to guess a severity. 'not pulled' when the source never returned."""
+    f = log.facts
+    sev1 = f.get("open_sev1")
+    hold = f.get("launch_hold")
+    return "\n".join([
+        f"- open Sev-1: {'not pulled' if sev1 is None else ', '.join(sev1) or 'none'}",
+        f"- launch_hold flag: {'not pulled' if hold is None else 'yes' if hold else 'no'}",
+        f"- project status: {f.get('status', 'not pulled')}",
+    ])
+
+
+def write_summary(which: str, log: RunLog, *, exit_type: str, reason: str, cost: float) -> Path:
+    """Save the run summary next to the draft: what was pulled and when, gaps and
+    errors, every critic verdict with its notes, and the story queue."""
+    lines = [f"# Cortex run summary: task-{which}", "",
+             f"- **Exit:** {exit_type}, {reason}",
+             f"- **Report week:** {WEEK_START} to {WEEK_END}",
+             f"- **Run cost:** ~${cost:.4f}",
+             "- **Posted:** nothing (Cortex has no publish tool)", "",
+             "## What was pulled", "", "| Time | Source | Args | Result |", "|---|---|---|---|"]
+    lines += [f"| {p['time']} | `{p['source']}` | `{json.dumps(p['args'])}` | {p['result']} |"
+              for p in log.pulls]
+    gaps = [f"- `{fn}` failed {n}x" for fn, n in log.failures.items()]
+    gaps += [f"- Parked: `{fn}` [needs input]" for fn in log.parked]
+    gaps += [f"- Stale: {log.stale}"] if log.stale else []
+    gaps += [f"- Core data failure: {log.core_failure}"] if log.core_failure else []
+    lines += ["", "## Gaps and errors", ""] + (gaps or ["- None"])
+    lines += ["", "## Critic verdicts", ""]
+    for i, v in enumerate(log.critic, 1):
+        lines.append(f"### Round {i}: {v.get('verdict')}")
+        lines += [f"- {r}" for r in v.get("reasons", [])] or ["- (no hard violations)"]
+        if v.get("notes"):
+            lines += ["", "Notes (non-blocking):"] + [f"- {n}" for n in v["notes"]]
+        lines.append("")
+    if not log.critic:
+        lines += ["- The critic never ran (the run stopped before a draft).", ""]
+    lines += ["## Story queue", ""]
+    if log.stories:
+        lines.append(f"- **Status:** {log.stories.get('status', log.stories.get('error'))}"
+                     f" ({log.stories.get('count', 0)} of max {MAX_QUEUE_ITEMS})")
+        lines += [f"{i}. {s}" for i, s in enumerate(log.stories.get("stories") or [], 1)]
+        if log.stories.get("reason"):
+            lines.append(f"- **Reason:** {log.stories['reason']}")
+    else:
+        lines.append("- No stories proposed.")
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    out = OUTPUT_DIR / f"run-summary-{which}.md"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
+def emit_deliverable(which: str, draft: str, log: RunLog, *, exit_type: str,
+                     reason: str, cost: float, keep_draft: bool = True) -> None:
+    """Surface AND persist the run's result so it can't get lost in the scroll-back.
+    The draft is still held for human review, never a post, there is no publish tool.
+
+    Runs on every exit. SUCCESS and STUCK: PARTIAL print the FINAL update (the latter
+    with its parked sections flagged); STUCK: TOTAL and ESCALATE print the LAST draft
+    plus why it was held. A run that stopped on missing core data saves no draft.
     """
-    banner("FINAL STATUS UPDATE (draft, validator-approved, NOT posted)" if accepted
-           else "LAST DRAFT (held, NOT posted, escalated to a human)")
-    if draft.strip():
+    banner(f"EXIT: {exit_type}, {reason}")
+    if exit_type == SUCCESS:
+        banner("FINAL STATUS UPDATE (draft, validator-approved, NOT posted)")
+    elif exit_type == STUCK_PARTIAL:
+        banner("FINAL STATUS UPDATE, with parked sections [needs input] (NOT posted)")
+    else:
+        banner("LAST DRAFT (held, NOT posted, escalated to a human)")
+    if draft.strip() and keep_draft:
         print(draft.rstrip())
+    elif draft.strip():
+        print("(Draft withheld: it would be built on missing core data.)")
     else:
         print("(Cortex stopped before it produced a draft, nothing to show.)")
-    if not accepted:
+    if exit_type != SUCCESS:
         print(f"\nWhy it was held: {reason}")
 
-    if draft.strip():
+    root = Path(__file__).parent
+    if draft.strip() and keep_draft:
         OUTPUT_DIR.mkdir(exist_ok=True)
         out = OUTPUT_DIR / f"status-update-{which}.md"
-        state = "accepted by validator" if accepted else "HELD, escalated"
         out.write_text(
-            f"<!-- Cortex draft, {state}; NOT posted. Run cost ~ ${cost:.4f}. -->\n"
+            f"<!-- Cortex draft, exit {exit_type}; NOT posted. Run cost ~ ${cost:.4f}. -->\n"
             f"<!-- {reason} -->\n\n{draft.rstrip()}\n", encoding="utf-8")
-        print(f"\nSaved draft -> {out.relative_to(Path(__file__).parent)}  "
-              f"(for your review, nothing was posted)")
+        print(f"\nSaved draft -> {out.relative_to(root)}  (for your review, nothing was posted)")
+    summary = write_summary(which, log, exit_type=exit_type, reason=reason, cost=cost)
+    print(f"Saved run summary -> {summary.relative_to(root)}")
 
 
 def run(which: str = "happy") -> None:
     client = OpenAI()
     bounds = Bounds()
+    log = RunLog()
     task = tools.get_task(which)
     if "error" in task:
         print(task)
         return
+    project = re.search(r"^Project:\s*([\w-]+)", task["body"], re.MULTILINE)
+    log.task_project = project.group(1) if project else ""
 
-    banner(f"CORTEX RUN, fixture: task-{which}  (auto-queue cap {MAX_QUEUE_ITEMS} items)")
+    banner(f"CORTEX RUN, fixture: task-{which}  (auto-queue cap {MAX_QUEUE_ITEMS} items, "
+           f"report week {WEEK_START} to {WEEK_END})")
     print(task["body"])
 
     messages = [
@@ -160,7 +337,7 @@ def run(which: str = "happy") -> None:
         if bounds.over_cap():
             reason = f"cost cap ${COST_CAP_USD} hit at ${bounds.cost:.4f}"
             banner(f"BOUND TRIPPED, {reason}. Halting and escalating to a human.")
-            emit_deliverable(which, last_draft, accepted=False,
+            emit_deliverable(which, last_draft, log, exit_type=ESCALATE,
                              reason=reason, cost=bounds.cost)
             return
 
@@ -174,39 +351,64 @@ def run(which: str = "happy") -> None:
             for call in msg.tool_calls:
                 fn = call.function.name
                 args = json.loads(call.function.arguments or "{}")
-                result = tools.TOOLS[fn](**args)
+                result = call_tool(fn, args, log)
                 source_log.append(f"{fn}({args}) -> {json.dumps(result)}")
                 print(f"\n[step {step}] TOOL {fn}({args})")
                 print(f"          -> {json.dumps(result)[:300]}")
                 messages.append({"role": "tool", "tool_call_id": call.id,
                                  "content": json.dumps(result)})
+            if log.core_failure:
+                reason = f"core data can't be pulled: {log.core_failure}"
+                banner(f"STUCK, {reason}. Halting the whole run; no draft from missing data.")
+                emit_deliverable(which, last_draft, log, exit_type=STUCK_TOTAL,
+                                 reason=reason, cost=bounds.cost, keep_draft=False)
+                return
             continue
 
         # No tool calls => Cortex produced a proposed output. Validate it.
         proposed = msg.content or ""
         last_draft = proposed
+        escalation = ESCALATE_MARK.search(proposed)
         print(f"\n[step {step}] PROPOSED OUTPUT:\n{proposed}")
 
         banner("CRITIC, independent validation")
-        verdict = review(client, MODEL, proposed, "\n".join(source_log))
-        # Estimate critic spend too.
-        bounds.cost += (verdict["_usage"]["prompt"] * PRICE_IN
-                        + verdict["_usage"]["completion"] * PRICE_OUT) / 1_000_000
-        print(json.dumps({k: v for k, v in verdict.items() if k != "_usage"}, indent=2))
+        verdict = review(client, CRITIC_MODEL, proposed, "\n".join(source_log),
+                         facts_block(log))
+        # Estimate critic spend too, at the critic model's prices.
+        bounds.cost += (verdict["_usage"]["prompt"] * CRITIC_PRICE_IN
+                        + verdict["_usage"]["completion"] * CRITIC_PRICE_OUT) / 1_000_000
+        notes = {k: v for k, v in verdict.items() if k != "_usage"}
+        log.critic.append(notes)
+        print(json.dumps(notes, indent=2))
 
         if verdict["verdict"] == "pass":
-            banner(f"HITL CHECKPOINT, status update + any proposed stories queued for "
-                   f"your review. Nothing posted, no commitments made. "
-                   f"Run cost ≈ ${bounds.cost:.4f}")
-            emit_deliverable(which, proposed, accepted=True,
-                             reason="validator passed", cost=bounds.cost)
+            if escalation:
+                reason = f"Cortex escalated: {escalation.group(1).strip() or 'see draft'}"
+                banner(f"ESCALATE, handing this to you. Nothing posted. "
+                       f"Run cost ≈ ${bounds.cost:.4f}")
+                emit_deliverable(which, proposed, log, exit_type=ESCALATE,
+                                 reason=reason, cost=bounds.cost)
+            elif log.parked or log.stale:
+                gaps = ", ".join(log.parked + ([log.stale] if log.stale else []))
+                banner(f"HITL CHECKPOINT, update finished with parked sections ({gaps}). "
+                       f"Ready for your review. Nothing posted. Run cost ≈ ${bounds.cost:.4f}")
+                emit_deliverable(which, proposed, log, exit_type=STUCK_PARTIAL,
+                                 reason=f"finished with parked sections [needs input]: {gaps}",
+                                 cost=bounds.cost)
+            else:
+                banner(f"HITL CHECKPOINT, status update + any proposed stories queued and "
+                       f"ready for your review. Nothing posted, no commitments made. "
+                       f"Run cost ≈ ${bounds.cost:.4f}")
+                emit_deliverable(which, proposed, log, exit_type=SUCCESS,
+                                 reason="critic passed; ready for your review", cost=bounds.cost)
             return
 
         if revisions >= MAX_REVISIONS:
-            reason = f"validator rejected {MAX_REVISIONS}x (revision cap)"
+            reason = (f"Critic failed – needs review (rejected after {MAX_REVISIONS} "
+                      f"revisions; critic notes in the run summary)")
             banner(f"REVISION CAP hit ({MAX_REVISIONS}). Escalating to a human "
                    f"instead of looping. Run cost ≈ ${bounds.cost:.4f}")
-            emit_deliverable(which, last_draft, accepted=False,
+            emit_deliverable(which, last_draft, log, exit_type=ESCALATE,
                              reason=reason, cost=bounds.cost)
             return
 
@@ -217,11 +419,10 @@ def run(which: str = "happy") -> None:
                          "A validator rejected that for these reasons: "
                          f"{verdict['reasons']}. Fix it or escalate."})
 
-    banner(f"MAX ITERATIONS ({MAX_ITERATIONS}) reached without finishing. "
-           f"Escalating. Run cost ≈ ${bounds.cost:.4f}")
-    emit_deliverable(which, last_draft, accepted=False,
-                     reason=f"max iterations ({MAX_ITERATIONS}) reached",
-                     cost=bounds.cost)
+    reason = f"{MAX_ITERATIONS}-iteration cap hit without a passing draft"
+    banner(f"STUCK, {reason}. Halting. Run cost ≈ ${bounds.cost:.4f}")
+    emit_deliverable(which, last_draft, log, exit_type=STUCK_TOTAL,
+                     reason=reason, cost=bounds.cost)
 
 
 if __name__ == "__main__":
