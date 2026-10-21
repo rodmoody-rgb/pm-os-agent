@@ -106,4 +106,7 @@ A plain in-process function call (`critic.review` in `00-build/critic.py`); no M
 
 ## 7. Cost & latency budget
 
-_Coordination has a price. Rough token/latency cost of the fleet vs a single agent. (Forward-link to M5 bounds.)_
+- **Extra calls:** the critic adds 1–3 `gpt-4o` calls per run (1 per draft; max 3 at the revision cap), plus up to 2 Cortex revision calls.
+- **Cost:** ≈ $0.004 per run with no critic → ≈ $0.009 when the critic passes first time → ≈ $0.024 at the revision cap (measured on my M2 and M3 runs). Both are far under the $0.50 per-run cap.
+- **Latency:** ≈ +5–10s per critic round (estimated, not timed), so +5–30s before a draft reaches me; fine for a Friday-noon run.
+- **Bound (→ M5):** keep the $0.50 per-run cost cap, enforced in code outside the model, and alert if a run goes over $0.05. "I can revise it later."
