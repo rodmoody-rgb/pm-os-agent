@@ -80,7 +80,10 @@ norms.
 
 FAIL the draft only for a hard violation:
 1. Untraceable: a status, metric, date, PR/issue or story reference that is not in
-   the pulled data (invented progress or numbers).
+   the pulled data (invented progress or numbers). Recency counts too: anything
+   presented as this week's progress (shipped, merged, "latest") must come from
+   get_activity items dated in the report week (see FACTS), not from a past update
+   or the roadmap. Past updates are precedent for tone only.
 2. Norms breach: an unconfirmed ship/GA date committed, a launch gate marked, a green
    call while the FACTS block shows an open Sev-1 or a launch_hold flag, or a
    CONFIDENTIAL roadmap item in the update. Take Sev-1 and launch_hold only from

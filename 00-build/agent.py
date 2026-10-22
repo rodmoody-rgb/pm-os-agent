@@ -63,6 +63,10 @@ CRITIC_MODEL = os.environ.get("CORTEX_CRITIC_MODEL", "gpt-4o")
 CRITIC_PRICE_IN = float(os.environ.get("CORTEX_CRITIC_PRICE_IN_PER_M", "2.50"))
 CRITIC_PRICE_OUT = float(os.environ.get("CORTEX_CRITIC_PRICE_OUT_PER_M", "10.00"))
 
+# --- M4 test switch: withhold sources for the grounding probe (comma-separated tool
+# names, e.g. "get_activity"). Off by default; a withheld tool returns an error.
+WITHHELD = {s.strip() for s in os.environ.get("CORTEX_WITHHOLD", "").split(",") if s.strip()}
+
 # --- M3 test switch: plant a bad first draft so the critic has something to catch.
 # Off by default; never set it for a real run. The plant breaks check 1 (an invented
 # metric) and check 2 (a committed GA date), and is labelled in the trace.
@@ -214,7 +218,11 @@ def call_tool(fn: str, args: dict, log: RunLog) -> dict:
         return {"error": "source_parked", "source": fn,
                 "action": "this source is parked; mark its section [needs input] and finish the rest"}
     try:
-        result = tools.TOOLS[fn](**args)
+        if fn in WITHHELD:
+            result = {"error": "source_withheld", "source": fn,
+                      "detail": "unavailable this run (CORTEX_WITHHOLD grounding probe)"}
+        else:
+            result = tools.TOOLS[fn](**args)
     except Exception as exc:  # a broken or unknown source counts as a failed attempt
         result = {"error": "tool_exception", "detail": str(exc)}
 
@@ -265,6 +273,17 @@ def expand_reasons(reasons: list) -> list[str]:
     return out
 
 
+def missing_core(log: RunLog) -> list[str]:
+    """Core sources that never returned data for the task's project this run. Loop
+    Spec §3: no draft is built on missing core data, however few times Cortex tried."""
+    def ok(fn):
+        return any(p["source"] == fn and p["result"] == "ok"
+                   and (not log.task_project or str(p["args"].get("project_id", "")).strip()
+                        .upper() == log.task_project.upper())
+                   for p in log.pulls)
+    return sorted(fn for fn in CORE_SOURCES if not ok(fn))
+
+
 def facts_block(log: RunLog) -> str:
     """The norms-critical facts, read from the pulled data in code so the critic never
     has to guess a severity. 'not pulled' when the source never returned."""
@@ -278,6 +297,7 @@ def facts_block(log: RunLog) -> str:
         f"- launch_hold flag: {'not pulled' if hold is None else 'yes' if hold else 'no'}",
         f"- project status: {f.get('status', 'not pulled')}",
         f"- story cap: {MAX_QUEUE_ITEMS} ({queued} queued)",
+        f"- report week: {WEEK_START} to {WEEK_END}",
     ])
 
 
@@ -426,6 +446,14 @@ def run(which: str = "happy") -> None:
         last_draft = proposed
         escalation = ESCALATE_MARK.search(proposed)
         print(f"\n[step {step}] PROPOSED OUTPUT:\n{proposed}")
+
+        gaps = missing_core(log)
+        if gaps and not escalation:
+            reason = f"core data never pulled this run: {', '.join(gaps)}"
+            banner(f"STUCK, {reason}. Halting; no update built on missing core data.")
+            emit_deliverable(which, proposed, log, exit_type=STUCK_TOTAL,
+                             reason=reason, cost=bounds.cost, keep_draft=False)
+            return
 
         banner("CRITIC, independent validation")
         verdict = review(client, CRITIC_MODEL, proposed, "\n".join(source_log),
