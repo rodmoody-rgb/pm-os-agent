@@ -32,10 +32,11 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 import tools
 from critic import review
@@ -53,6 +54,11 @@ MODEL = os.environ.get("CORTEX_MODEL", "gpt-4o-mini")
 MAX_ITERATIONS = int(os.environ.get("CORTEX_MAX_ITERATIONS", "8"))
 MAX_REVISIONS = int(os.environ.get("CORTEX_MAX_REVISIONS", "2"))
 COST_CAP_USD = float(os.environ.get("CORTEX_COST_CAP_USD", "0.50"))
+COST_ALERT_USD = float(os.environ.get("CORTEX_COST_ALERT_USD", "0.05"))  # warn, don't stop
+DAILY_CAP_USD = float(os.environ.get("CORTEX_DAILY_CAP_USD", "2.00"))   # across all runs today
+TIMEOUT_S = float(os.environ.get("CORTEX_TIMEOUT_S", "90"))              # wall clock per run
+# Kill switch: false/0/no/off stops Cortex before any model call.
+ENABLED = os.environ.get("CORTEX_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
 MAX_QUEUE_ITEMS = int(os.environ.get("CORTEX_MAX_QUEUE_ITEMS", "10"))
 # Rough $ per 1M tokens for your chosen model, set to match its pricing.
 PRICE_IN = float(os.environ.get("CORTEX_PRICE_IN_PER_M", "0.15"))
@@ -149,17 +155,61 @@ TOOL_SCHEMAS = [
 
 
 class Bounds:
-    """Tracks spend and trips the cost cap. This is enforced OUTSIDE the model."""
+    """Tracks spend and wall-clock time and trips the caps. Enforced OUTSIDE the model.
+    A run's budget is the per-run cap or what's left of today's cap, whichever is less."""
 
-    def __init__(self):
+    def __init__(self, spent_today: float = 0.0):
         self.cost = 0.0
+        self.start = time.monotonic()
+        self.daily_left = max(DAILY_CAP_USD - spent_today, 0.0)
+        self.budget = min(COST_CAP_USD, self.daily_left)
 
     def add(self, usage) -> None:
         self.cost += (usage.prompt_tokens * PRICE_IN
                       + usage.completion_tokens * PRICE_OUT) / 1_000_000
 
     def over_cap(self) -> bool:
-        return self.cost >= COST_CAP_USD
+        return self.cost >= self.budget
+
+    def cap_reason(self) -> str:
+        if self.budget < COST_CAP_USD:
+            return (f"daily cap ${DAILY_CAP_USD:.2f} reached (${self.daily_left:.4f} was left "
+                    f"today; this run spent ${self.cost:.4f})")
+        return f"cost cap ${COST_CAP_USD} hit at ${self.cost:.4f}"
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.start
+
+    def timed_out(self) -> bool:
+        return self.elapsed() >= TIMEOUT_S
+
+    def remaining_s(self) -> float:
+        """Time left for the next model call, so a hung call can't outlive the run."""
+        return max(TIMEOUT_S - self.elapsed(), 1.0)
+
+
+SPEND_LEDGER = Path(__file__).parent / "run-output" / "spend-ledger.json"
+
+
+def spent_today() -> float:
+    """Today's total spend across runs, from the local ledger (git-ignored)."""
+    try:
+        return float(json.loads(SPEND_LEDGER.read_text()).get(date.today().isoformat(), 0.0))
+    except (FileNotFoundError, ValueError):
+        return 0.0
+
+
+def record_spend(cost: float) -> float:
+    """Add this run's cost to today's total; returns the new total."""
+    try:
+        ledger = json.loads(SPEND_LEDGER.read_text())
+    except (FileNotFoundError, ValueError):
+        ledger = {}
+    today = date.today().isoformat()
+    ledger[today] = round(float(ledger.get(today, 0.0)) + cost, 6)
+    SPEND_LEDGER.parent.mkdir(exist_ok=True)
+    SPEND_LEDGER.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")
+    return ledger[today]
 
 
 class RunLog:
@@ -178,6 +228,7 @@ class RunLog:
         self.critic: list[dict] = []
         self.stories: dict | None = None
         self.injected = False  # M3 test switch fired this run
+        self.last_draft = ""   # kept here so a timeout can still hand it over
 
 
 OUTPUT_DIR = Path(__file__).parent / "run-output"
@@ -308,6 +359,7 @@ def write_summary(which: str, log: RunLog, *, exit_type: str, reason: str, cost:
              f"- **Exit:** {exit_type}, {reason}",
              f"- **Report week:** {WEEK_START} to {WEEK_END}",
              f"- **Run cost:** ~${cost:.4f}",
+             *([f"- **ALERT:** run cost over ${COST_ALERT_USD:.2f}"] if cost > COST_ALERT_USD else []),
              "- **Posted:** nothing (Cortex has no publish tool)",
              *(["- **Test switch:** CORTEX_INJECT_BAD_DRAFT planted the first draft"]
                if log.injected else []), "",
@@ -378,11 +430,24 @@ def emit_deliverable(which: str, draft: str, log: RunLog, *, exit_type: str,
         print(f"\nSaved draft -> {out.relative_to(root)}  (for your review, nothing was posted)")
     summary = write_summary(which, log, exit_type=exit_type, reason=reason, cost=cost)
     print(f"Saved run summary -> {summary.relative_to(root)}")
+    if cost > COST_ALERT_USD:
+        banner(f"ALERT: run cost ${cost:.4f} is over the ${COST_ALERT_USD:.2f} alert line")
+    total = record_spend(cost)
+    print(f"Spend today: ${total:.4f} of ${DAILY_CAP_USD:.2f} daily cap")
 
 
 def run(which: str = "happy") -> None:
+    if not ENABLED:
+        banner("KILL SWITCH: CORTEX_ENABLED=false. Not running; no model calls made.")
+        return
+    today = spent_today()
+    if today >= DAILY_CAP_USD:
+        banner(f"DAILY CAP: ${today:.4f} already spent today (cap ${DAILY_CAP_USD:.2f}). "
+               f"Not running; no model calls made.")
+        return
+
     client = OpenAI()
-    bounds = Bounds()
+    bounds = Bounds(spent_today=today)
     log = RunLog()
     task = tools.get_task(which)
     if "error" in task:
@@ -400,19 +465,33 @@ def run(which: str = "happy") -> None:
         {"role": "user", "content": f"PM task brief:\n\n{task['body']}"},
     ]
     source_log: list[str] = [task["body"]]
+
+    try:
+        loop(which, client, bounds, log, messages, source_log)
+    except APITimeoutError:
+        reason = f"timeout {TIMEOUT_S:.0f}s hit (a model call hung) after {bounds.elapsed():.0f}s"
+        banner(f"BOUND TRIPPED, {reason}. Halting and escalating to a human.")
+        emit_deliverable(which, log.last_draft, log, exit_type=ESCALATE,
+                         reason=reason, cost=bounds.cost)
+
+
+def loop(which, client, bounds, log, messages, source_log) -> None:
+    """The bounded agent loop. Every exit goes through emit_deliverable."""
     revisions = 0
     last_draft = ""
 
     for step in range(1, MAX_ITERATIONS + 1):
-        if bounds.over_cap():
-            reason = f"cost cap ${COST_CAP_USD} hit at ${bounds.cost:.4f}"
+        if bounds.over_cap() or bounds.timed_out():
+            reason = (bounds.cap_reason() if bounds.over_cap()
+                      else f"timeout {TIMEOUT_S:.0f}s hit after {bounds.elapsed():.0f}s")
             banner(f"BOUND TRIPPED, {reason}. Halting and escalating to a human.")
             emit_deliverable(which, last_draft, log, exit_type=ESCALATE,
                              reason=reason, cost=bounds.cost)
             return
 
         resp = client.chat.completions.create(
-            model=MODEL, messages=messages, tools=TOOL_SCHEMAS)
+            model=MODEL, messages=messages, tools=TOOL_SCHEMAS,
+            timeout=bounds.remaining_s())
         bounds.add(resp.usage)
         msg = resp.choices[0].message
 
@@ -443,7 +522,7 @@ def run(which: str = "happy") -> None:
             msg = {"role": "assistant", "content": proposed}
             print(f"\n[step {step}] TEST SWITCH CORTEX_INJECT_BAD_DRAFT: replacing "
                   f"Cortex's first draft with a planted bad one")
-        last_draft = proposed
+        last_draft = log.last_draft = proposed
         escalation = ESCALATE_MARK.search(proposed)
         print(f"\n[step {step}] PROPOSED OUTPUT:\n{proposed}")
 
@@ -456,7 +535,14 @@ def run(which: str = "happy") -> None:
             return
 
         banner("CRITIC, independent validation")
-        verdict = review(client, CRITIC_MODEL, proposed, "\n".join(source_log),
+        if bounds.timed_out():
+            reason = f"timeout {TIMEOUT_S:.0f}s hit after {bounds.elapsed():.0f}s, before the critic"
+            banner(f"BOUND TRIPPED, {reason}. Halting and escalating to a human.")
+            emit_deliverable(which, last_draft, log, exit_type=ESCALATE,
+                             reason=reason, cost=bounds.cost)
+            return
+        verdict = review(client.with_options(timeout=bounds.remaining_s()), CRITIC_MODEL,
+                         proposed, "\n".join(source_log),
                          facts_block(log))
         # Estimate critic spend too, at the critic model's prices.
         bounds.cost += (verdict["_usage"]["prompt"] * CRITIC_PRICE_IN
