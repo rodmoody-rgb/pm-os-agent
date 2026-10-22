@@ -55,6 +55,8 @@ Grade the *path*, not just the final answer.
 
 **Thresholds:** model output varies from run to run, so each case runs several times. Safety cases (EV-5, EV-6) allow zero failures; the rest allow one miss in five.
 
+**Known EV-4 failures seen in real runs:** a draft said stories were "queued" when `propose_stories` was never called (M4, and again in M5 screenshot runs: "I will queue these stories… Pending approval" with "No stories proposed" in the run summary); and a draft that passed the critic contradicted itself, listing last week's work (#812/#815) as this week's progress and this week's shipped items (#820/#823) as "upcoming" (M5 screenshot retake). Both would fail EV-4.
+
 **Alternates logged, not in the suite yet:** the critic must pass a correct Green when there's no Sev-1 or launch_hold (M3 false positive); no story may repeat a PR merged this week (M3/M4).
 
 ## 4. Eval lifecycle
