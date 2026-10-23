@@ -1,110 +1,105 @@
-# Cortex: PM Chief-of-Staff Agent
+# Cortex
 
-> My final project for Product School's **Agentic Loops for PMs** certification. A chief-of-staff agent that turns raw inputs (project state, GitHub/Jira activity, roadmap, past updates) into finished PM work, a leadership status update and a proposed backlog for a human to clear, built loop-first, bounded, grown into a fleet, and shipped up the Trust Ladder.
+> A PM chief-of-staff agent that drafts the weekly leadership update for an ezyVet project from this week's engineering activity, queues next-sprint stories for approval, and never posts on its own.
 
-This is a **template repo**. Click **Use this template → Create a new repository**, name it `pm-os-agent` (or your own agent's name), and fill in one folder per module as you go.
+**Rod Moody · Agentic Loops for PMs cohort · October 2026**
 
----
+This repo is my final project for the Agentic Loops for PMs Certification, Cortex. Each module's artifact lives in its own folder; this README is the dashboard and the pitch. The pitch deck is [`pitch.html`](pitch.html).
 
-## The story this repo tells
-
-Strategy first, structure second. This repo is the **build journey of one agent, Cortex**, laid out as the exact sequence of decisions a PM makes when shipping an AI agent team. **Each folder is one framework from the course**, in the order you actually use it, and each ends in a **validation point** — a deliverable, a validator, or an eval — that proves the step is sound before you build on the next one.
-
-Read it top to bottom as a narrative:
-
-| # | The move (story beat) | Framework | Folder | What this step validates |
-|---|---|---|---|---|
-| 1 | **Draw the line** — decide what the agent owns vs. what stays human, *before* anything runs | The Agent Line | `01-agent-line/` | Every risky action has a clear owner |
-| 2 | **Make it loop** — turn that hand-off into an agent that fires itself and knows when it's "done" | Loop Engineering | `02-loop-design/` | The agent knows when to run and when to stop ★ |
-| 3 | **Grow the team** — split into a fleet only when there's a real reason, and add a validator | Orchestration | `03-orchestration/` | Nothing advances unchecked ★ |
-| 4 | **Feed it context** — give each run the right memory without leaking or drifting | Context Engineering & Memory | `04-memory-context/` | The agent reasons on the right, safe inputs |
-| 5 | **Bound it & prove it** — design for when it goes sideways, and spec it by writing its evals | Bounds, Trust & Evals | `05-bounds-evals/` | It fails safe and is measured |
-| 6 | **Ship & widen trust** — demo it, reflect, and set how far up the Trust Ladder it may climb | Autonomy & the Trust Ladder | `06-autonomy/` | It runs end-to-end and earns autonomy with evidence ★ |
-
-> **Why the numbers?** The folders keep a leading number so they sort in build order on GitHub; the name after it (`-agent-line`, `-loop-design`, …) is the framework. Number = *when*, name = *what*.
+**Current Trust Ladder rung: Shadow.** Cortex is built and tested on sample data, with a defined 4-week gate to move to supervised (below).
 
 ---
 
-## How each lab runs: paste the module's `LAB.md` into your AI assistant
+## Module artifacts
 
-Every module folder ships a **`LAB.md`** — a runbook written *for your AI assistant*. Instead of reading a
-guide and filling in a form, you **paste the module's `LAB.md` into your coding agent (Claude Code, Cursor,
-Codex) or a chatbot (ChatGPT, Claude, Gemini)** and it walks you through the lab: it asks for your
-decisions one step at a time, writes the deliverable file, runs Cortex where needed, and commits.
+### M1 · The Agent Line
+- **Agent-line map**: [`01-agent-line/agent-line-map.md`](01-agent-line/agent-line-map.md)
 
-| Module | Paste this into your assistant |
-|---|---|
-| M1 | `01-agent-line/LAB.md` |
-| M2 | `02-loop-design/LAB.md` |
-| M3 | `03-orchestration/LAB.md` |
-| M4 | `04-memory-context/LAB.md` |
-| M5 | `05-bounds-evals/LAB.md` |
-| M6 | `06-autonomy/LAB.md` |
+### M2 · Loop Engineering
+- **Loop spec**: [`02-loop-design/loop-spec.md`](02-loop-design/loop-spec.md)
 
-A good opener: *"Open `05-bounds-evals/LAB.md` in this repo and walk me through it one step at a time.
-Stop and ask me at every decision."* If your assistant can't read files (plain ChatGPT), paste the
-`LAB.md` contents directly and it will print each block for you to paste into the deliverable file.
+### M3 · Orchestration & Subagents
+- **Orchestration map**: [`03-orchestration/orchestration-map.md`](03-orchestration/orchestration-map.md)
 
-> The **prompt pack** in [`00-build/PROMPTS.md`](00-build/PROMPTS.md) is the quick-reference / fallback:
-> the individual prompts the `LAB.md` files use, if you'd rather drive step by step yourself.
+### M4 · Context Engineering & Memory
+- **Memory & context plan**: [`04-memory-context/memory-and-context.md`](04-memory-context/memory-and-context.md)
 
----
+### M5 · Bounds & Evals
+- **Bounds & evals**: [`05-bounds-evals/bounds-and-evals.md`](05-bounds-evals/bounds-and-evals.md)
 
-## Deliverables at a glance
+### M6 · Autonomy & Production
+- **Production & autonomy plan**: [`06-autonomy/production-and-autonomy.md`](06-autonomy/production-and-autonomy.md)
+- **Prototype write-up (6 run screenshots)**: [`06-autonomy/prototype.md`](06-autonomy/prototype.md)
+- **Build insights**: [`06-autonomy/build-insights.md`](06-autonomy/build-insights.md)
 
-| # | Deliverable | Module | Status | File |
-|---|---|---|---|---|
-| 1 | **Working agent demo** (real run screenshots; link optional) | Built across labs | ☐ | `06-autonomy/prototype.md` |
-| 2 | **Loop Spec** | M2 | ☐ | `02-loop-design/loop-spec.md` |
-| 3 | **Orchestration Map** | M3 | ☐ | `03-orchestration/orchestration-map.md` |
-| 4 | **Insights: build process** | M6 | ☐ | `06-autonomy/build-insights.md` |
-| 5 | **Bounds, trust & autonomy strategy** | M6 | ☐ | `06-autonomy/production-and-autonomy.md` |
-
-## The agent in one sentence
-
-_What does your agent do, for whom, and where is the agent line, what does it decide vs. what stays human?_
-
-## Build & demo
-
-- **How you built it:** _which coding agent (Claude Code / Cursor / Codex) you directed, start in `00-build/`_
-- **Demo link:** _[optional shareable URL]_
-- **Run screenshots:** _required, collected M2 to M6 in `06-autonomy/prototype.md`_
-
-## Where it sits on the Trust Ladder
-
-_shadow · assisted · supervised · bounded-autonomous · autonomous, which rung today, and what eval evidence would let it climb the next one?_
+### The build
+- **Code**: [`00-build/`](00-build/) (`agent.py`, `critic.py`, `tools.py`, `prompts.py`)
+- **Run it**: `cd 00-build && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`, copy `.env.example` to `.env` and add `OPENAI_API_KEY`, then `CORTEX_REPORT_WEEK=2026-07-03 .venv/bin/python agent.py`. Other tasks: `missing-data`, `jailbreak`, `commitment`.
 
 ---
 
-## How to submit
+## Ship plan
 
-- Turn the five deliverable files into your final deck (use the **Final Project Deliverables Builder** that ships with the course, it generates `pitch.html` + a clean `README.md` for you, or a tool like Gamma).
-- Submit your own copy to the learning platform within 7 days of your cohort ending.
+### Autonomy dial (per segment)
 
-## Repo structure
+| Segment | Autonomy (Trust Ladder rung) | Why |
+|---|---|---|
+| **ezyVet PM** | **Supervised**: Cortex drafts the full update and queues stories; the PM reviews and approves at every checkpoint, then posts | Owns the project and knows its stories in detail, so can catch an error in a quick review. Accountable for delivery and decides which stories make the cut. |
+| **PMO Project Manager / Product Marketing** | **Assisted**: Cortex drafts pieces on request; they write the update | Works across initiatives without deep context on any one project, but owns stakeholder communication and coordinates commitments from other teams. Cortex never drafts a commitment for them; dates and commitment levels escalate to the owning PM. |
+| **Engineering Lead / Product Leadership** | **Assisted**: Cortex drafts pieces on request; they write or edit | Has the high-level picture but not always the detail on dependencies and edge cases, so needs to see the sources rather than trust a finished draft. |
 
-```
-pm-os-agent/
-├── README.md                          ← this dashboard
-├── 00-build/                          ← runnable starter: the transparent Cortex agent,
-│   │                                    fixtures, RUNBOOK, PROMPTS, CORTEX-ANATOMY
-│   ├── RUNBOOK.md                     ← open in your coding agent, add a key, run a fixture, screenshot
-│   ├── PROMPTS.md                     ← the prompt pack: what to say to your coding agent
-│   ├── CORTEX-ANATOMY.md              ← the 7 things every submission must show
-│   ├── agent.py · critic.py · tools.py · prompts.py
-│   └── fixtures/                      ← mock PM tasks + project/roadmap/updates/norms data
-├── 01-agent-line/
-│   └── agent-line-map.md              ← M1: what to hand to the agent (above vs below the line)
-├── 02-loop-design/
-│   └── loop-spec.md                   ← M2: the Loop Spec                 ★ Deliverable 2
-├── 03-orchestration/
-│   └── orchestration-map.md           ← M3: your fleet + the validator     ★ Deliverable 3
-├── 04-memory-context/
-│   └── memory-and-context.md          ← M4: retrieve-vs-long-context + your PM brain
-├── 05-bounds-evals/
-│   └── bounds-and-evals.md            ← M5: hard bounds + trajectory evals
-└── 06-autonomy/
-    ├── prototype.md                   ← demo + screenshots                ★ Deliverable 1
-    ├── build-insights.md              ← friction · learning · aha         ★ Deliverable 4
-    └── production-and-autonomy.md     ← dial · Trust Ladder · governance  ★ Deliverable 5
-```
+The dial sets how many of Cortex's below-the-line steps pause for review for each group. It never moves the M1 agent line: posting company-wide, committing a date and choosing what to escalate stay with a human for everyone.
+
+**Task-level autonomy, planned:** fetching metrics from Datadog for the weekly report can run at **bounded-autonomous** for every group. It's read-only, presented as is, and checkable against the source, so it needs no review pause. Each value is cited with its query, service and time window, and pulled with a read-only key scoped to the agreed dashboards. The update containing it still goes through each group's normal review. Not built yet: needs a Datadog connector.
+
+### Trust Ladder rung + eval gate
+
+- **Current rung: Shadow.** Built and tested on sample data, but not yet run on a real project; next it runs alongside my real weekly update so the two can be compared.
+- **Eval gate (shadow → supervised):** 4 consecutive weeks of shadow runs on **1 real ezyVet project**, compared against my own update, where:
+  - **Safety (EV-5, EV-6): 100%**, zero policy violations, and both pass 10/10 in the offline suite before the window starts
+  - **Accuracy: ≥ 95% of checkable claims** (PRs, dates, metrics, status, stories) match the sources, and stories described as queued were actually queued (EV-4)
+  - **Usefulness: in ≥ 3 of 4 weeks**, the draft needed only minor edits to match what I sent
+  - **Wrong escalations: ≤ 1 in 4**
+  - **Incidents: zero.** Any post, leak, committed date or cap breach **restarts the 4-week window**
+
+  Each further project repeats a shorter shadow window before Cortex runs supervised on it.
+- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. In testing, **2 issues fixed** (the critic's bare-number reasons left Cortex unable to revise; a run with no activity data exited SUCCESS on last week's update) and **2 open** (stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic).
+
+### Deployment plan
+
+- **Runtime:** an IDEXX-approved internal runtime, so real ezyVet data stays inside IDEXX's governed environment, not on a laptop or in this public repo. Triggered by a Friday 12:00 schedule, plus the product lead's request as a backup hook.
+- **Operator / on-call owner:** me (the owning PM). Backup: the project's tech lead (Robert Richardson for the first shadow project). Escalation path: me → tech lead → kill switch.
+- **Rollback:** (1) kill switch `CORTEX_ENABLED=false` stops every run before any model call; (2) revert `prompts.py` or the critic to the last version that passed the evals; (3) disable one tool with `CORTEX_WITHHOLD`; (4) drop the dial one rung for the affected group.
+- **Monitoring:** eval pass rate; escalation and wrong-escalation rate; cost per run and per day (alert at $0.05, daily cap $2); run time against the 90-second limit; trust incidents.
+
+### ROI metrics
+
+| Metric | Target | How it's captured |
+|---|---|---|
+| **Outcome: my time per weekly update** | ~30 min today → **10 min** reviewing Cortex's draft (≈ 17 hours a year per PM) | Minutes noted each week during shadow |
+| **Cost to serve** | ≈ $0.01 model cost per update + ~10 min review time | Run summary (cost) + my time log |
+| **Trust incidents** | **0** per month; wrong escalations ≤ 1 in 4 | Incident record + run summaries |
+
+### Widen-autonomy rule
+
+A group moves up one rung only after Cortex meets that rung's gate for the full window with zero incidents, decided by the owning PM and recorded. Any safety incident drops it back one rung immediately.
+
+### Governance & strategy
+
+- **Compliance:** never in a prompt: clinic and pet-owner data from ezyVet practices, other personal data, credentials and API keys, and roadmap items marked CONFIDENTIAL.
+- **Safety:** above the agent line for everyone: posting company-wide, committing a date or commitment level, choosing what to escalate. Cortex has no publish tool; kill switch owned by me, with the tech lead as backup.
+- **Reliability:** 8 turns, 90 seconds, $0.50 per run, $2 per day, 3 tries per source; stop and escalate when stuck. If the model is down: no draft, a "Cortex unavailable" notice, and I write the update myself.
+- **Next capability:** the Datadog metric fetch, gated by **EV-7, metric fidelity**: over 4 weeks of shadow, 100% of fetched values match Datadog and a scan finds zero personal data in prompts.
+- **Next segment:** PMO Project Manager / Product Marketing, from assisted to supervised, once the ezyVet PM has passed the supervised gate.
+
+---
+
+## Build insights
+
+- **Friction: grounding and retrieval.** Cortex never invented numbers outright. It used real data from the wrong week and read as perfectly confident, which was harder to spot than a hallucination and took code checks, not prompt wording, to stop. Making retrieval trustworthy meant deciding per source which checks it needed: routing to the right project, grading out stale or confidential items, reranking to put the newest approved update first, and knowing when to read a source whole instead.
+- **Key learning.** Limits belong in code, not prompts: the safeguards that held were counters, caps and missing tools. And every failure needs a named exit, so a bad run ends visibly and safely instead of quietly producing something wrong.
+- **Aha moment.** The dangerous failure isn't the obvious lie; it's the plausible stale fact. When I held back this week's activity, Cortex wrote "this week's" update from last week's data, and it passed every check that only asked "is this in the data?". Next time I'd check *when* a fact is from, not just *whether* it exists.
+
+---
+
+_Certification submission, Agentic Loops for PMs Certification._
