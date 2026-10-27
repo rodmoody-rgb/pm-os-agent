@@ -111,12 +111,12 @@ a:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radiu
           <li>≤ 1 in 4 escalations unnecessary</li>
           <li>Zero incidents; any incident restarts the window</li>
         </ul>
-        <p class="note">Record: no real-world incidents. In testing, 2 issues fixed and 2 open (stories described as queued that weren't; stale progress passing the critic).</p>
+        <p class="note">Record: no real-world incidents. In testing, 2 issues fixed and 3 open (stories described as queued that weren't; stale progress passing the critic; the GA-date request flagged in a note instead of escalated).</p>
       </div></div>
       <div class="exec-card"><div class="exec-step">03 &middot; Deploy</div><h3>Where it runs &amp; who owns it</h3><div class="exec-body">
         <ul>
           <li><strong>Runtime:</strong> an IDEXX-approved internal runtime, so real ezyVet data stays in a governed environment. Friday 12:00 schedule plus the product lead's request.</li>
-          <li><strong>Owner:</strong> me (owning PM). Backup: the project's tech lead (Robert Richardson for the first project). Me &rarr; tech lead &rarr; kill switch.</li>
+          <li><strong>Owner:</strong> me (owning PM). Backup: the project's tech lead. Me &rarr; tech lead &rarr; kill switch.</li>
           <li><strong>Rollback:</strong> kill switch <code>CORTEX_ENABLED=false</code>; revert prompts or critic to the last passing version; disable a tool; drop the dial a rung.</li>
           <li><strong>Monitoring:</strong> eval pass rate, escalation and wrong-escalation rate, cost per run and per day, run time vs 90 s, trust incidents.</li>
         </ul>

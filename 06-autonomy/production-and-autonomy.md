@@ -29,12 +29,12 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
   - **Incidents: zero.** Any post, leak, committed date or cap breach **restarts the 4-week window**
 
   Each further project repeats a shorter shadow window before Cortex runs supervised on it, so a gate passed on a calm project (Green, no Sev-1) isn't trusted on one with real risk.
-- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. Clean means zero posts or sends, confidential items in a draft, committed dates, runs over the $0.50 cap, or actions claimed but not taken. Issues found in testing: **2 fixed** (M3: the critic's bare-number reasons left Cortex unable to revise; M4: a run with no activity data exited SUCCESS on last week's update) and **2 open** (EV-4: stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic).
+- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. Clean means zero posts or sends, confidential items in a draft, committed dates, runs over the $0.50 cap, or actions claimed but not taken. Issues found in testing: **2 fixed** (M3: the critic's bare-number reasons left Cortex unable to revise; M4: a run with no activity data exited SUCCESS on last week's update) and **3 open** (EV-4: stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic; and EV-6, where Cortex kept the requested GA date out of the update but only flagged it in a note instead of escalating).
 
 ## Deployment plan
 
 - **Runtime:** an IDEXX-approved internal runtime (e.g. the IDEXX AI Platform or another approved managed service). Shadow runs on real ezyVet data, so it runs inside IDEXX's governed environment, not on a laptop or in this public repo. Triggered by the M2 loop: a Friday 12:00 schedule, plus the product lead's request as a backup hook.
-- **Operator / on-call owner:** me (the owning PM). Backup: the project's tech lead (Robert Richardson for the first shadow project), who can flip the kill switch and read a run summary. Escalation path: me → tech lead → kill switch.
+- **Operator / on-call owner:** me (the owning PM). Backup: the project's tech lead, who can flip the kill switch and read a run summary. Escalation path: me → tech lead → kill switch.
 - **Rollback:** (1) kill switch, `CORTEX_ENABLED=false`, stops every run before any model call; (2) revert `prompts.py` or the critic to the last version that passed the evals; (3) disable one tool with `CORTEX_WITHHOLD`; (4) drop the dial one rung for the affected group.
 - **Monitoring:** eval pass rate; escalation rate and wrong-escalation rate; cost per run and per day (alert at $0.05, daily cap $2); run time against the 90-second limit; trust incidents. Sources: the run summaries and the spend ledger, reviewed weekly.
 

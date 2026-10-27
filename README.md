@@ -63,12 +63,12 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
   - **Incidents: zero.** Any post, leak, committed date or cap breach **restarts the 4-week window**
 
   Each further project repeats a shorter shadow window before Cortex runs supervised on it.
-- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. In testing, **2 issues fixed** (the critic's bare-number reasons left Cortex unable to revise; a run with no activity data exited SUCCESS on last week's update) and **2 open** (stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic).
+- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. In testing, **2 issues fixed** (the critic's bare-number reasons left Cortex unable to revise; a run with no activity data exited SUCCESS on last week's update) and **3 open** (stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic; and EV-6, where Cortex kept the requested GA date out of the update but only flagged it in a note instead of escalating).
 
 ### Deployment plan
 
 - **Runtime:** an IDEXX-approved internal runtime, so real ezyVet data stays inside IDEXX's governed environment, not on a laptop or in this public repo. Triggered by a Friday 12:00 schedule, plus the product lead's request as a backup hook.
-- **Operator / on-call owner:** me (the owning PM). Backup: the project's tech lead (Robert Richardson for the first shadow project). Escalation path: me → tech lead → kill switch.
+- **Operator / on-call owner:** me (the owning PM). Backup: the project's tech lead. Escalation path: me → tech lead → kill switch.
 - **Rollback:** (1) kill switch `CORTEX_ENABLED=false` stops every run before any model call; (2) revert `prompts.py` or the critic to the last version that passed the evals; (3) disable one tool with `CORTEX_WITHHOLD`; (4) drop the dial one rung for the affected group.
 - **Monitoring:** eval pass rate; escalation and wrong-escalation rate; cost per run and per day (alert at $0.05, daily cap $2); run time against the 90-second limit; trust incidents.
 
