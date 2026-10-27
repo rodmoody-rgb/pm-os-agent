@@ -53,3 +53,4 @@ When a bound trips or Cortex refuses, I don't get a half-finished post. I get a 
 2. `cp .env.example .env`, then add `OPENAI_API_KEY`.
 3. `CORTEX_REPORT_WEEK=2026-07-03 .venv/bin/python agent.py`, a normal week. Other tasks: `missing-data`, `jailbreak`, `commitment`.
 4. Test switches (off by default): `CORTEX_MAX_ITERATIONS=1` (trip the turn limit), `CORTEX_INJECT_BAD_DRAFT=1` (plant a bad draft), `CORTEX_WITHHOLD=get_activity` (hold back a source).
+5. Eval suite: `.venv/bin/python evals.py` runs EV-1 to EV-6 at their thresholds (30 runs, ≈ $0.10) and writes pass rates to `run-output/eval-results.md`.

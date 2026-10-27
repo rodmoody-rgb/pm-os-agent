@@ -29,7 +29,7 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
   - **Incidents: zero.** Any post, leak, committed date or cap breach **restarts the 4-week window**
 
   Each further project repeats a shorter shadow window before Cortex runs supervised on it, so a gate passed on a calm project (Green, no Sev-1) isn't trusted on one with real risk.
-- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. Clean means zero posts or sends, confidential items in a draft, committed dates, runs over the $0.50 cap, or actions claimed but not taken. Issues found in testing: **2 fixed** (M3: the critic's bare-number reasons left Cortex unable to revise; M4: a run with no activity data exited SUCCESS on last week's update) and **3 open** (EV-4: stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic; and EV-6, where Cortex kept the requested GA date out of the update but only flagged it in a note instead of escalating).
+- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. Clean means zero posts or sends, confidential items in a draft, committed dates, runs over the $0.50 cap, or actions claimed but not taken. Issues found in testing: **4 fixed** (M3: the critic's bare-number reasons left Cortex unable to revise; M4: a run with no activity data exited SUCCESS on last week's update; M6: stories described as queued when `propose_stories` was never called; M6: a GA-date request flagged in a note instead of escalated) and **1 open** (a draft that listed last week's PRs as this week's progress still passed the critic). Measured eval pass rates: all six cases meet their thresholds (`05-bounds-evals/bounds-and-evals.md` §3).
 
 ## Deployment plan
 
@@ -42,9 +42,31 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
 
 | Metric | Target | How it's captured |
 |---|---|---|
-| **Outcome: my time per weekly update** | ~30 min today → **10 min** reviewing Cortex's draft (≈ 20 min a week, ~17 hours a year per PM) | Minutes noted each week during shadow |
+| **Outcome: my time per weekly update** | ~30 min today → **10 min** reviewing Cortex's draft (≈ 20 min a week, ~15 hours a year per PM over 46 working weeks) | Minutes noted each week during shadow |
 | **Cost to serve** | ≈ $0.01 model cost per update + ~10 min review time | Run summary (cost) + my time log |
 | **Trust incidents** | **0** per month; wrong escalations ≤ 1 in 4 | Incident record + run summaries |
+
+### Scaling to the team: the hypothesis
+
+We start with one project, but the target is the whole product team: **7 PMs** who each write a weekly delivery report, and a **weekly 1-hour read-out** attended by the 7 PMs, the Head of Product and **7 engineering leads (15 people)**. Assumes 46 working weeks a year.
+
+| Saving | Conservative | Expected |
+|---|---|---|
+| **Writing:** 7 PMs, ~30 min per report | 30 → 15 min · ≈ 80 h/yr | 30 → 10 min · ≈ 107 h/yr |
+| **Read-out:** 15 people, 60 min | 60 → 45 min · ≈ 173 h/yr | 60 → 30 min · ≈ 345 h/yr |
+| **Total** | **≈ 250 person-hours/yr** | **≈ 450 person-hours/yr** (about 11 working weeks) |
+| **Model cost** | ≈ $3 a year (7 PMs × $0.01 × 46 weeks) | ≈ $3 a year |
+
+> **We believe that** if Cortex drafts each PM's weekly delivery report from sourced data, **then** report writing drops from ~30 to ~10 minutes per PM and the weekly read-out can shift to exceptions-only (about 60 → 30 minutes), **because** a consistent, sourced pre-read removes the need to read status aloud. Across 7 PMs, the Head of Product and 7 engineering leads, that's **≈ 250–450 person-hours a year** for about $3 of model cost.
+>
+> **We'll know we're right when**, after the first 3 PMs pass the supervised gate, their writing time is ≤ 15 minutes for 4 weeks *and* a 30-minute exceptions-only read-out runs for 4 weeks without the Head of Product missing a risk.
+>
+> **We'll stop or narrow it if** PMs still need heavy edits (more than minor in more than 1 in 4 weeks) or the meeting can't shrink. Then Cortex stays a drafting aid for individual PMs, not a team process.
+
+- **Why the meeting can shrink:** the read-out moves from everyone reading out status to discussing only the exceptions (Yellow or Red projects, escalations, commitments). That's a team behaviour change Cortex enables, not something it does by itself, which is why it's the half of the saving we test hardest.
+- **Beyond time:** every report has the same format and the same rules (no Green with an open Sev-1), so leadership compares like with like; risks and escalations surface the same way across all projects; fewer ad-hoc status questions between meetings.
+- **Why an agent, not a template or a dashboard:** a template saves formatting, not the gathering and cross-checking of data; a dashboard shows metrics, not the narrative, the risks or what needs a decision. Cortex does the gathering, applies the norms and flags the exceptions, which is the part that takes the 30 minutes.
+- **The savings ramp up:** each PM's project passes its own shadow gate first (Trust Ladder), so year one delivers less than the full range.
 
 ## Widen-autonomy decision rule
 

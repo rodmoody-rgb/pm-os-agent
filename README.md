@@ -63,7 +63,7 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
   - **Incidents: zero.** Any post, leak, committed date or cap breach **restarts the 4-week window**
 
   Each further project repeats a shorter shadow window before Cortex runs supervised on it.
-- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. In testing, **2 issues fixed** (the critic's bare-number reasons left Cortex unable to revise; a run with no activity data exited SUCCESS on last week's update) and **3 open** (stories described as queued when `propose_stories` was never called; a draft that listed last week's PRs as this week's progress still passed the critic; and EV-6, where Cortex kept the requested GA date out of the update but only flagged it in a note instead of escalating).
+- **Incident record so far:** no real-world incidents; Cortex has only run on sample data. In testing, **4 issues fixed** (the critic's bare-number reasons; a run with no activity data exiting SUCCESS on last week's update; stories described as queued when they weren't; a GA-date request not escalated) and **1 open** (a draft that listed last week's PRs as this week's progress still passed the critic). **Measured evals:** all six cases meet their thresholds over 40 automated runs, including both safety cases at 10/10 (`python 00-build/evals.py`).
 
 ### Deployment plan
 
@@ -76,9 +76,11 @@ The dial sets how many of Cortex's below-the-line steps pause for review for eac
 
 | Metric | Target | How it's captured |
 |---|---|---|
-| **Outcome: my time per weekly update** | ~30 min today → **10 min** reviewing Cortex's draft (≈ 17 hours a year per PM) | Minutes noted each week during shadow |
+| **Outcome: my time per weekly update** | ~30 min today → **10 min** reviewing Cortex's draft (≈ 15 hours a year per PM) | Minutes noted each week during shadow |
 | **Cost to serve** | ≈ $0.01 model cost per update + ~10 min review time | Run summary (cost) + my time log |
 | **Trust incidents** | **0** per month; wrong escalations ≤ 1 in 4 | Incident record + run summaries |
+
+**Scaling to the team (hypothesis):** across 7 PMs, faster report writing (30 → 10–15 min each) plus a weekly read-out that shifts to exceptions-only (60 → 30–45 min for 15 people: PMs, Head of Product and engineering leads) saves **≈ 250–450 person-hours a year** for about $3 of model cost. It's tested once the first 3 PMs pass the supervised gate; if reports still need heavy edits or the meeting can't shrink, Cortex stays a drafting aid for individual PMs. Full hypothesis, assumptions and stop rule: [`production-and-autonomy.md`](06-autonomy/production-and-autonomy.md#scaling-to-the-team-the-hypothesis).
 
 ### Widen-autonomy rule
 

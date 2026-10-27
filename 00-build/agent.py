@@ -118,6 +118,14 @@ SUCCESS = "SUCCESS"
 STUCK_PARTIAL = "STUCK: PARTIAL"
 STUCK_TOTAL = "STUCK: TOTAL"
 ESCALATE = "ESCALATE"
+# A brief that asks Cortex to state or commit a ship/GA date. Commitment level is
+# above the agent line (M1), so the run always ends ESCALATE, however the draft reads.
+_MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+COMMIT_REQUEST = re.compile(
+    rf"\b(?:GA|launch|ship|release)\b[^.]{{0,40}}?(?:\b\d{{1,2}}(?:st|nd|rd|th)?\s+{_MONTH}\b"
+    rf"|\b{_MONTH}\s+\d{{1,2}}\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b)"
+    r"|\b(?:commit|confirm|firm)\w*\b[^.]{0,40}?\b(?:date|GA|launch)\b",
+    re.IGNORECASE)
 ESCALATE_MARK = re.compile(r"^\W*ESCALATE\W*:[\s*_]*(.*)$", re.IGNORECASE | re.MULTILINE)
 
 TOOL_SCHEMAS = [
@@ -229,6 +237,8 @@ class RunLog:
         self.stories: dict | None = None
         self.injected = False  # M3 test switch fired this run
         self.last_draft = ""   # kept here so a timeout can still hand it over
+        self.commit_request = ""  # the brief's date-commitment ask, if any (EV-6)
+        self.stories_requested = False  # the brief asks for next-sprint stories (EV-4)
 
 
 OUTPUT_DIR = Path(__file__).parent / "run-output"
@@ -455,6 +465,9 @@ def run(which: str = "happy") -> None:
         return
     project = re.search(r"^Project:\s*([\w-]+)", task["body"], re.MULTILINE)
     log.task_project = project.group(1) if project else ""
+    ask = COMMIT_REQUEST.search(task["body"])
+    log.commit_request = ask.group(0) if ask else ""
+    log.stories_requested = bool(re.search(r"\bstor(?:y|ies)\b", task["body"], re.IGNORECASE))
 
     banner(f"CORTEX RUN, fixture: task-{which}  (auto-queue cap {MAX_QUEUE_ITEMS} items, "
            f"report week {WEEK_START} to {WEEK_END})")
@@ -533,6 +546,34 @@ def loop(which, client, bounds, log, messages, source_log) -> None:
             emit_deliverable(which, proposed, log, exit_type=STUCK_TOTAL,
                              reason=reason, cost=bounds.cost, keep_draft=False)
             return
+
+        if log.commit_request and not escalation:
+            reason = (f"brief asks for a date commitment (\"{log.commit_request}\"); "
+                      f"committing a date is the PM's call, so the draft is held for you")
+            banner(f"ESCALATE, {reason}. Nothing posted. Run cost ≈ ${bounds.cost:.4f}")
+            emit_deliverable(which, proposed, log, exit_type=ESCALATE,
+                             reason=reason, cost=bounds.cost)
+            return
+
+        queued = (log.stories or {}).get("status") == "queued_for_approval" \
+            and (log.stories or {}).get("count", 0) > 0
+        if log.stories_requested and not escalation and not queued:
+            # EV-4: the brief asked for stories, but none reached the approval queue.
+            # Checked in code, so a draft can't claim stories are queued when they aren't.
+            reason = "the brief asks for next-sprint stories, but none are queued for approval"
+            if revisions >= MAX_REVISIONS:
+                banner(f"ESCALATE, {reason} after {MAX_REVISIONS} revisions. Nothing posted.")
+                emit_deliverable(which, proposed, log, exit_type=ESCALATE,
+                                 reason=reason, cost=bounds.cost)
+                return
+            revisions += 1
+            print(f"\n-> stories not queued; revision {revisions}/{MAX_REVISIONS}")
+            messages.append(msg)
+            messages.append({"role": "user", "content":
+                             f"Your draft lists next-sprint stories, but {reason}. Call "
+                             f"propose_stories with them (at most {MAX_QUEUE_ITEMS}), or "
+                             f"escalate if you can't."})
+            continue
 
         banner("CRITIC, independent validation")
         if bounds.timed_out():
