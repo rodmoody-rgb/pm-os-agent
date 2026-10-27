@@ -10,7 +10,8 @@
 - **What Cortex does.** Every Friday it drafts each PM's update from sourced data (merged PRs, open issues, metrics), queues next-sprint stories for approval, and has an independent checker review the draft. It can't publish anything: every draft waits for the PM.
 - **The evidence.** Built and run end to end on sample data. 40 automated test runs: all six tests meet their bar, including the two safety tests at 10/10. Testing found 5 real issues; 4 are fixed in code, 1 is open.
 - **Where it stands.** On the Trust Ladder at **shadow**: not yet used on a real project. It earns **supervised** after 4 weeks on one real project with ≥ 95% of claims matching the sources and no incidents.
-- **The prize.** If it scales to the team and the read-out shifts to exceptions only, ≈ **250–450 person-hours a year** for about $3 of model cost. That's a hypothesis, with a test and a stop rule.
+- **The prize.** If it scales to the team and the read-out shifts to exceptions only, ≈ **250–450 person-hours a year** for about $3 of model cost, paying back an ≈ 80-hour build in 2.5–5 months. That's a hypothesis, with a test and a stop rule.
+- **Build vs buy.** We already have Atlassian Rovo, so the same six tests decide: if Rovo passes, we buy and keep only Cortex's checker on top. Team-scale decision by March 2027.
 
 ## How it works
 
@@ -36,6 +37,9 @@ Hard limits sit around every run, enforced in code rather than in instructions: 
 | **Trust Ladder** | Shadow today. To reach supervised: 4 weeks on 1 real project, safety tests 100%, ≥ 95% of claims correct, minor edits only in 3 of 4 weeks, zero incidents (any incident restarts the clock). | [Trust Ladder](06-autonomy/production-and-autonomy.md#trust-ladder) |
 | **Deployment** | Runs on an IDEXX-approved internal platform; I own it with the tech lead as backup; rollback is a kill switch, a prompt revert or dropping a rung. | [Deployment plan](06-autonomy/production-and-autonomy.md#deployment-plan) |
 | **ROI** | Per PM: ~30 → 10 minutes a week. Team: ≈ 250–450 person-hours a year, tested once 3 PMs pass the supervised gate; stop if reports still need heavy edits or the meeting can't shrink. | [ROI and team hypothesis](06-autonomy/production-and-autonomy.md#scaling-to-the-team-the-hypothesis) |
+| **Build vs buy & payback** | Rovo bake-off on the six tests first. If we build: ≈ 80 h plus 1 h a week to run, paid back in ≈ 2.5–5 months at team scale. | [Build vs buy and cost](06-autonomy/production-and-autonomy.md#build-vs-buy-let-the-tests-decide) |
+| **Rollout** | Nov 2026: bake-off and build. Dec: 1-project gate. Jan–Feb 2027: 3 PMs. March: exceptions-only read-out and the team go/stop call. | [Rollout timeline](06-autonomy/production-and-autonomy.md#rollout-timeline) |
+| **Strategic fit** | A safe, measured template for AI adoption at IDEXX/ezyVet; the same pattern reuses for release notes, sprint reviews and incident summaries. Top risks: messy Jira data, rubber-stamp reviews, model approval, single owner. | [Fit and risks](06-autonomy/production-and-autonomy.md#strategic-fit-a-template-for-ai-adoption) |
 | **Widening autonomy** | Up one rung only after a full clean window; any safety incident drops it back one rung immediately. | [Widen rule](06-autonomy/production-and-autonomy.md#widen-autonomy-decision-rule) |
 | **Governance** | No customer, pet-owner or personal data and no confidential roadmap items in prompts. Next: pull metrics from Datadog, gated by a metric-accuracy test. | [Governance](06-autonomy/production-and-autonomy.md#governance--forward-strategy) |
 

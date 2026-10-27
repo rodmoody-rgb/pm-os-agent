@@ -68,6 +68,49 @@ We start with one project, but the target is the whole product team: **7 PMs** w
 - **Why an agent, not a template or a dashboard:** a template saves formatting, not the gathering and cross-checking of data; a dashboard shows metrics, not the narrative, the risks or what needs a decision. Cortex does the gathering, applies the norms and flags the exceptions, which is the part that takes the 30 minutes.
 - **The savings ramp up:** each PM's project passes its own shadow gate first (Trust Ladder), so year one delivers less than the full range.
 
+## Build vs buy, cost and rollout
+
+### Build vs buy: let the tests decide
+
+ezyVet already licenses Atlassian Rovo, so the first step is a bake-off, not a build: run the same six tests (EV-1 to EV-6) with Rovo producing the drafts from the same data.
+
+- **If Rovo passes:** buy. Rovo does the drafting and retrieval; only Cortex's independent checker, hard limits and approval step sit on top, so the build shrinks to the checker.
+- **If Rovo fails the safety tests (below 10/10) or the accuracy bar:** build. Rovo summarises Jira; Cortex combines Jira, GitHub, metrics and team norms, and its checker, caps and missing publish tool are what the tests prove.
+
+### Cost and payback (if we build)
+
+| Item | Estimate |
+|---|---|
+| **Build** | Jira and GitHub connectors, hosting on an IDEXX-approved platform (e.g. the IDEXX AI Platform) and a security review: **≈ 10 engineer-days (80 h)** |
+| **Run** | ≈ 1 hour a week of my time on run summaries, eval results and prompt tweaks: **≈ 46 h a year** |
+| **Model** | ≈ $3 a year |
+| **Net saving at team scale** | 250–450 − 46 ≈ **200–400 person-hours a year** |
+| **Payback on the build** | **≈ 2.5–5 months** once the team is using it (80 h ÷ 400–200 h a year). Year one pays back later, because the savings ramp up one project at a time. |
+
+### Rollout timeline
+
+| When | Step | Moves on when |
+|---|---|---|
+| **November 2026** | Rovo bake-off and the build-or-buy decision; then build and security review (≈ 2 weeks) | The six tests have run on Rovo; security has signed off |
+| **Late Nov – Dec 2026** | Shadow on 1 real project for 4 weeks (runs into January if holiday weeks have no update) | The supervised gate is passed |
+| **Jan – Feb 2027** | 3 PMs: each project's shorter shadow window, then supervised | 3 PMs at ≤ 15 minutes per report for 4 weeks |
+| **March 2027** | A 30-minute exceptions-only read-out for 4 weeks | Team-scale go or stop, per the hypothesis above |
+
+### Strategic fit: a template for AI adoption
+
+Cortex supports the company goal of adopting AI agents safely. It's a measured template for teams at IDEXX and ezyVet: autonomy is earned rung by rung with evidence, limits are enforced in code rather than instructions, and the agent line keeps people accountable for what gets posted or committed.
+
+- **Reuse:** the pattern of a sourced draft, an independent checker and no publish tool carries straight over to release notes, sprint-review summaries and incident summaries. The checker, limits, eval runner and Trust Ladder come along with it, so the second agent costs much less than the first.
+
+### Risks
+
+| Risk | Mitigation |
+|---|---|
+| **Messy Jira data:** a draft is only as good as the data it's built from | The ≥ 95% accuracy gate; `STUCK` exits flag missing data; the shadow comparison shows where project data needs cleaning up |
+| **Rubber-stamp reviews:** PMs approve drafts without reading them | The checker still runs on every draft; the "minor edits" measure; a monthly spot-check of one approved update against its sources |
+| **Model approval:** OpenAI may not be the approved model | Both models are settings (`CORTEX_MODEL`, `CORTEX_CRITIC_MODEL`); re-run the six tests on the approved model before switching |
+| **Single owner:** everything depends on me | The tech lead as backup with the kill switch; a second PM trained as owner before the team rollout |
+
 ## Widen-autonomy decision rule
 
 A group moves up one rung only after Cortex meets that rung's gate for the full window with zero incidents, decided by the owning PM and recorded in this doc. Any safety incident drops it back one rung immediately.

@@ -91,7 +91,7 @@ a:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radiu
   <section class="block">
     <div class="eyebrow">Ship plan</div>
     <h2>How I'd ship Cortex</h2>
-    <p class="lede">The autonomy dial per segment, where it sits on the trust ladder, how it deploys, what it returns, and how I keep it safe.</p>
+    <p class="lede">The autonomy dial per segment, where it sits on the trust ladder, how it deploys, what it returns, how I keep it safe, and when it rolls out.</p>
     <div class="exec-rail">
       <div class="exec-card"><div class="exec-step">01 &middot; Dial</div><h3>Autonomy per segment</h3><div class="exec-body">
         <ul>
@@ -125,6 +125,7 @@ a:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radiu
         <ul>
           <li><strong>Outcome:</strong> my time per weekly update, ~30 min today &rarr; 10 min reviewing Cortex's draft (≈ 15 hours a year per PM). Logged weekly during shadow.</li>
           <li><strong>At team scale (hypothesis):</strong> 7 PMs writing faster, plus the weekly read-out for 15 people shifting to exceptions-only (60 &rarr; 30–45 min): <strong>≈ 250–450 person-hours a year</strong> for ~$3 of model cost. Tested once 3 PMs pass the supervised gate.</li>
+          <li><strong>Payback:</strong> ≈ 80 h to build plus 1 h a week to run; net 200–400 h a year, so ≈ 2.5–5 months at team scale.</li>
           <li><strong>Cost to serve:</strong> ≈ $0.01 model cost per update plus ~10 min review. From the run summary and my time log.</li>
           <li><strong>Trust incidents:</strong> 0 per month; wrong escalations ≤ 1 in 4. From the incident record and run summaries.</li>
         </ul>
@@ -135,6 +136,14 @@ a:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radiu
           <li><strong>Safety:</strong> posting, committing dates and choosing what to escalate stay human for everyone. No publish tool; kill switch owned by me, tech lead as backup.</li>
           <li><strong>Reliability:</strong> 8 turns, 90 s, $0.50 per run, $2 per day, 3 tries per source; stop and escalate when stuck. Model down: no draft, I write it myself.</li>
           <li><strong>Next:</strong> Datadog metric fetch, gated by a metric-accuracy test (100% of values match Datadog, zero personal data in prompts, over 4 weeks); then PMO / Product Marketing to supervised.</li>
+        </ul>
+      </div></div>
+      <div class="exec-card"><div class="exec-step">06 &middot; Rollout</div><h3>Build vs buy, timeline &amp; fit</h3><div class="exec-body">
+        <ul>
+          <li><strong>Build vs buy:</strong> we already have Atlassian Rovo, so it runs the same six tests first. Passes: buy, keep only Cortex's checker on top. Fails safety or accuracy: build.</li>
+          <li><strong>Timeline:</strong> Nov 2026 bake-off and build; Dec 1-project gate; Jan–Feb 2027 3 PMs; March exceptions-only read-out and the team go/stop call.</li>
+          <li><strong>Fit:</strong> a safe, measured template for AI adoption at IDEXX/ezyVet. The same pattern reuses for release notes, sprint reviews and incident summaries.</li>
+          <li><strong>Top risks:</strong> messy Jira data, rubber-stamp reviews, model approval, single owner. Each has a mitigation in the plan.</li>
         </ul>
       </div></div>
     </div>
